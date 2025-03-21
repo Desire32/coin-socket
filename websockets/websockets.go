@@ -1,7 +1,6 @@
 package websockets
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -68,7 +67,6 @@ func (w *SocketsService) SocketsInit() error {
 				Topic: topic,
 				Value: sarama.StringEncoder(string(message)),
 			}
-			fmt.Println(string(message))
 		}
 	}
 

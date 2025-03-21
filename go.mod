@@ -3,13 +3,12 @@ module broker
 go 1.24.1
 
 require (
+	github.com/IBM/sarama v1.45.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 )
 
 require (
-	github.com/IBM/sarama v1.45.1 // indirect
-	github.com/JustSkiv/goschedviz v0.0.6
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
