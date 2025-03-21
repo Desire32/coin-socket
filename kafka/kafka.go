@@ -8,24 +8,34 @@ import (
 	"github.com/IBM/sarama"
 )
 
-type KafkaService struct{}
+type KafkaService struct {
+	consumer sarama.Consumer
+}
+
+func NewKafkaService(brokers []string) (*KafkaService, error) {
+	consumer, err := sarama.NewConsumer(brokers, sarama.NewConfig())
+	if err != nil {
+		return nil, err
+	}
+	return &KafkaService{
+		consumer: consumer,
+	}, nil
+}
 
 func (k *KafkaService) KafkaOutput() error {
+	if k.consumer == nil {
+		return fmt.Errorf("kafka hasnt been initialized")
+	}
 	var wg sync.WaitGroup
 	topics := []string{"solana-messages", "ether-messages", "bitcoin-messages", "binance-messages"}
 
-	consumer, err := sarama.NewConsumer([]string{"localhost:9092"}, sarama.NewConfig())
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	kafka_sched := func(topic string) {
-		partition, err := consumer.Partitions(topic)
+		partition, err := k.consumer.Partitions(topic)
 		if err != nil {
 			log.Fatal(err)
 		}
 		for _, part := range partition {
-			pc, err := consumer.ConsumePartition(topic, part, sarama.OffsetNewest)
+			pc, err := k.consumer.ConsumePartition(topic, part, sarama.OffsetNewest)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -39,7 +49,9 @@ func (k *KafkaService) KafkaOutput() error {
 
 	for _, t := range topics {
 		wg.Add(1)
-		go kafka_sched(t)
+		go func(topic string) {
+			kafka_sched(topic)
+		}(t)
 	}
 	wg.Wait()
 

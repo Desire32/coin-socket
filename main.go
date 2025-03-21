@@ -4,17 +4,27 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"time"
 
 	kfk "broker/kafka"
 	skts "broker/websockets"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	_ = godotenv.Load(".env")
 
-	// link with structs
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+
+	// link
 	socketsService := &skts.SocketsService{}
-	kafkaService := &kfk.KafkaService{}
+	kafkaService, err := kfk.NewKafkaService([]string{kafkaBroker})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//websockets
 	go func() {
@@ -25,14 +35,10 @@ func main() {
 
 	// kafka output
 	go func() {
-		time.Sleep(5 * time.Second)
 		if err := kafkaService.KafkaOutput(); err != nil {
 			log.Fatal(err)
 		}
 	}()
-
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
 
 	// infinite channel read
 	<-interrupt

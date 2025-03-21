@@ -1,8 +1,8 @@
 package websockets
 
 import (
+	"fmt"
 	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -10,13 +10,7 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/gorilla/websocket"
-	"github.com/joho/godotenv"
 )
-
-// init function
-func init() {
-	_ = godotenv.Load("../.env")
-}
 
 type SocketsService struct {
 	conn []*websocket.Conn
@@ -53,28 +47,13 @@ func (w *SocketsService) SocketsInit() error {
 	}
 
 	// solana
-	solana, err := connectToWebSocket(os.Getenv("SOLANA_API"))
-	if err != nil {
-		log.Fatal("Solana WebSocket error:", err)
-	}
-	// bitcoin
-	bitcoin, err := connectToWebSocket(os.Getenv("BITCOIN_API"))
-	if err != nil {
-		log.Fatal("Bitcoin WebSocket error:", err)
-	}
-	// binance
-	binance, err := connectToWebSocket("BINANCE_API")
-	if err != nil {
-		log.Fatal("Binance WebSocket error:", err)
-	}
-	// ether
-	ether, err := connectToWebSocket(os.Getenv("ETHEREUM_API"))
-	if err != nil {
-		log.Fatal("Ethereum WebSocket error:", err)
-	}
+	solana, _ := connectToWebSocket("wss://ws.coincap.io/prices?assets=solana")
+	bitcoin, _ := connectToWebSocket("wss://ws.coincap.io/prices?assets=bitcoin")
+	binance, _ := connectToWebSocket("wss://stream.binance.com:9443/ws/btcusdt@trade")
+	ether, _ := connectToWebSocket("wss://ws.coincap.io/prices?assets=ethereum")
 
-	ticker := time.NewTicker(2 * time.Second)
-	binance_ticker := time.NewTicker(7 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
+	binance_ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	defer binance_ticker.Stop()
 
@@ -89,6 +68,7 @@ func (w *SocketsService) SocketsInit() error {
 				Topic: topic,
 				Value: sarama.StringEncoder(string(message)),
 			}
+			fmt.Println(string(message))
 		}
 	}
 
@@ -97,6 +77,7 @@ func (w *SocketsService) SocketsInit() error {
 	go go_sched(bitcoin, "bitcoin-messages", ticker)
 	go go_sched(binance, "binance-messages", binance_ticker)
 	go go_sched(ether, "ether-messages", ticker)
+	wg.Wait()
 
 	w.closeWebSockets()
 
