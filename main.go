@@ -65,12 +65,23 @@ func main() {
 	defer ether.Close()
 	////////////////////////////////////////////////////
 
+	////////////////////////////////////////////////////
+	// Binance trades init
+	binance, _, err := websocket.DefaultDialer.Dial(os.Getenv("BINANCE_API"), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer binance.Close()
+	////////////////////////////////////////////////////
+
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
 	// response latency
 	ticker := time.NewTicker(2 * time.Second)
+	binance_ticker := time.NewTicker(7 * time.Second)
 	defer ticker.Stop()
+	defer binance_ticker.Stop()
 
 	// websockets
 	go func() {
@@ -121,6 +132,23 @@ func main() {
 					}
 					producer.Input() <- &sarama.ProducerMessage{
 						Topic: "ether-messages",
+						Value: sarama.StringEncoder(string(ether_message)),
+					}
+				}
+			}
+		}()
+		// binance
+		go func() {
+			for {
+				select {
+				case <-binance_ticker.C:
+					_, ether_message, err := ether.ReadMessage()
+					if err != nil {
+						log.Println("Binance error:", err)
+						return
+					}
+					producer.Input() <- &sarama.ProducerMessage{
+						Topic: "binance-messages",
 						Value: sarama.StringEncoder(string(ether_message)),
 					}
 				}
@@ -186,6 +214,25 @@ func main() {
 				}
 			}
 		}()
+
+		// binance
+		go func() {
+			binance_partitions, err := consumer.Partitions("binance-messages")
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, partition := range binance_partitions {
+				pc, err := consumer.ConsumePartition("binance-messages", partition, sarama.OffsetNewest)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer pc.Close()
+
+				for message := range pc.Messages() {
+					fmt.Printf("Binance trades: %s\n", string(message.Value))
+				}
+			}
+		}()
 	}()
 
 	// infinite channel read
@@ -196,4 +243,5 @@ func main() {
 	solana.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	ether.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	bitcoin.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	binance.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 }
