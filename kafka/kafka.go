@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"broker/websockets"
 	"fmt"
 	"log"
 	"sync"
@@ -9,16 +10,18 @@ import (
 )
 
 type KafkaService struct {
-	consumer sarama.Consumer
+	consumer       sarama.Consumer
+	socketsService *websockets.SocketsService
 }
 
-func NewKafkaService(brokers []string) (*KafkaService, error) {
+func NewKafkaService(brokers []string, socketsService *websockets.SocketsService) (*KafkaService, error) {
 	consumer, err := sarama.NewConsumer(brokers, sarama.NewConfig())
 	if err != nil {
 		return nil, err
 	}
 	return &KafkaService{
-		consumer: consumer,
+		consumer:       consumer,
+		socketsService: socketsService,
 	}, nil
 }
 

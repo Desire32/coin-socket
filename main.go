@@ -21,7 +21,7 @@ func main() {
 
 	// link
 	socketsService := &skts.SocketsService{}
-	kafkaService, err := kfk.NewKafkaService([]string{kafkaBroker})
+	kafkaService, err := kfk.NewKafkaService([]string{kafkaBroker}, socketsService)
 	if err != nil {
 		log.Fatal(err)
 	}

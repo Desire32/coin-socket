@@ -81,3 +81,5 @@ func (w *SocketsService) SocketsInit() error {
 
 	return nil
 }
+
+// html websockets part
