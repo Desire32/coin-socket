@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 
@@ -36,6 +37,14 @@ func main() {
 	// kafka output
 	go func() {
 		if err := kafkaService.KafkaOutput(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// http
+	go func() {
+		log.Println("starting on 8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
 			log.Fatal(err)
 		}
 	}()

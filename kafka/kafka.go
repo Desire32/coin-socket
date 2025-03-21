@@ -14,6 +14,9 @@ type KafkaService struct {
 	socketsService *websockets.SocketsService
 }
 
+var HtmlChan chan string
+var mu sync.Mutex
+
 func NewKafkaService(brokers []string, socketsService *websockets.SocketsService) (*KafkaService, error) {
 	consumer, err := sarama.NewConsumer(brokers, sarama.NewConfig())
 	if err != nil {
@@ -46,6 +49,10 @@ func (k *KafkaService) KafkaOutput() error {
 
 			for message := range pc.Messages() {
 				fmt.Printf("%s: %s\n", topic, string(message.Value))
+
+				// mu.Lock()
+				// HtmlChan <- string(message.Value)
+				// defer mu.Unlock()
 			}
 		}
 	}
