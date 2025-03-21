@@ -22,12 +22,15 @@ func main() {
 	////////////////////////////////////////////////////
 	// Kafka init
 	kafkaBroker := []string{os.Getenv("KAFKA_BROKER")}
+
+	//producer
 	producer, err := sarama.NewAsyncProducer(kafkaBroker, sarama.NewConfig())
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer producer.AsyncClose()
 
+	// consumer
 	consumer, err := sarama.NewConsumer(kafkaBroker, sarama.NewConfig())
 	if err != nil {
 		log.Fatal(err)
@@ -36,61 +39,161 @@ func main() {
 	///////////////////////////////////////////////////
 
 	////////////////////////////////////////////////////
-	// Gorilla Websocket init
-	conn, _, err := websocket.DefaultDialer.Dial(os.Getenv("BLOCKCHAIN_API"), nil)
+	// Solana Websocket init
+	solana, _, err := websocket.DefaultDialer.Dial(os.Getenv("SOLANA_API"), nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	defer solana.Close()
+	////////////////////////////////////////////////////
+
+	////////////////////////////////////////////////////
+	// Bitcoin Websocket init
+	bitcoin, _, err := websocket.DefaultDialer.Dial(os.Getenv("BITCOIN_API"), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer bitcoin.Close()
+	////////////////////////////////////////////////////
+
+	////////////////////////////////////////////////////
+	// Ethereum Websocket init
+	ether, _, err := websocket.DefaultDialer.Dial(os.Getenv("ETHEREUM_API"), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ether.Close()
 	////////////////////////////////////////////////////
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	// websocket api and kafka input
-	go func() {
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			fmt.Println(string(message))
+	// response latency
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 
-			// input
-			producer.Input() <- &sarama.ProducerMessage{
-				Topic: "websocket-messages",
-				Value: sarama.StringEncoder(string(message)),
+	// websockets
+	go func() {
+		// solana
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					_, sol_message, err := solana.ReadMessage()
+					if err != nil {
+						log.Println("Solana WebSocket error:", err)
+						return
+					}
+					producer.Input() <- &sarama.ProducerMessage{
+						Topic: "solana-messages",
+						Value: sarama.StringEncoder(string(sol_message)),
+					}
+				}
 			}
-			fmt.Println("Отправлено в Kafka:", string(message))
-		}
+		}()
+		// bitcoin
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					_, bit_message, err := bitcoin.ReadMessage()
+					if err != nil {
+						log.Println("Bitcoin WebSocket error:", err)
+						return
+					}
+					producer.Input() <- &sarama.ProducerMessage{
+						Topic: "bitcoin-messages",
+						Value: sarama.StringEncoder(string(bit_message)),
+					}
+				}
+			}
+		}()
+
+		// ether
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					_, ether_message, err := ether.ReadMessage()
+					if err != nil {
+						log.Println("Ether WebSocket error:", err)
+						return
+					}
+					producer.Input() <- &sarama.ProducerMessage{
+						Topic: "ether-messages",
+						Value: sarama.StringEncoder(string(ether_message)),
+					}
+				}
+			}
+		}()
 	}()
 
 	// kafka output
 	go func() {
-		partitions, err := consumer.Partitions("websocket-messages")
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, partition := range partitions {
-			pc, err := consumer.ConsumePartition("websocket-messages", partition, sarama.OffsetNewest)
+		go func() {
+			// solana
+			sol_partitions, err := consumer.Partitions("solana-messages")
 			if err != nil {
 				log.Fatal(err)
 			}
-			defer pc.Close()
+			for _, partition := range sol_partitions {
+				pc, err := consumer.ConsumePartition("solana-messages", partition, sarama.OffsetNewest)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer pc.Close()
 
-			for message := range pc.Messages() {
-				fmt.Printf("Kafka gotten message: %s\n", string(message.Value))
+				for message := range pc.Messages() {
+					fmt.Printf("Solana: %s\n", string(message.Value))
+				}
 			}
-		}
-	}()
+		}()
 
-	// response latency
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+		go func() {
+			// ether
+			eth_partitions, err := consumer.Partitions("ether-messages")
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, partition := range eth_partitions {
+				pc, err := consumer.ConsumePartition("ether-messages", partition, sarama.OffsetNewest)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer pc.Close()
+
+				for message := range pc.Messages() {
+					fmt.Printf("Ether: %s\n", string(message.Value))
+				}
+			}
+		}()
+
+		// bitcoin
+		go func() {
+			bit_partitions, err := consumer.Partitions("bitcoin-messages")
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, partition := range bit_partitions {
+				pc, err := consumer.ConsumePartition("bitcoin-messages", partition, sarama.OffsetNewest)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer pc.Close()
+
+				for message := range pc.Messages() {
+					fmt.Printf("Bitcoin: %s\n", string(message.Value))
+				}
+			}
+		}()
+	}()
 
 	// infinite channel read
 	<-interrupt
 	log.Println("Turning off..")
-	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+
+	//closers
+	solana.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	ether.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	bitcoin.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 }
