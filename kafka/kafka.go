@@ -15,7 +15,6 @@ type KafkaService struct {
 }
 
 var HtmlChan chan string
-var mu sync.Mutex
 
 func NewKafkaService(brokers []string, socketsService *websockets.SocketsService) (*KafkaService, error) {
 	consumer, err := sarama.NewConsumer(brokers, sarama.NewConfig())

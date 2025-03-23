@@ -18,9 +18,12 @@ type SocketsService struct {
 func (w *SocketsService) closeWebSockets() {
 	for _, v := range w.conn {
 		if v != nil {
-			v.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			if err := v.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
+				log.Fatal(err)
+			}
 			v.Close()
 		}
+
 	}
 }
 
